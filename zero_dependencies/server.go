@@ -2,6 +2,7 @@ package main
 
 import (
     "net/http"
+    "os"
     "encoding/json"
     "sync"
     "io/ioutil"
@@ -125,11 +126,32 @@ func (h *coastersHandlers) getCoaster(w http.ResponseWriter, r *http.Request) {
     w.Write(jsonBytes)
 }
 
+type adminPortal struct {
+    password string
+}
+func newAdminPortal() *adminPortal {
+    password:= os.Getenv("ADMIN_PASSWORD")
+    if password == "" {
+        panic("required env var ADMIN_PASSWORD not set")
+    }
+    return &adminPortal{password: password}
+}
 
+func (a adminPortal) handler(w http.ResponseWriter, r *http.Request) {
+    user, pass, ok := r.BasicAuth()
+    if !ok || user != "admin" || pass != a.password {
+        w.WriteHeader(http.StatusUnauthorized)
+        w.Write([]byte("401 Unauthorized"))
+        return
+    }
+    w.Write([]byte("<html><h1> admin portal</h1></html>"))
+}
 func main() {
+    admin := newAdminPortal()
     coastersHandlers := newCoasterHandlers()
     http.HandleFunc("/coasters", coastersHandlers.coasters)
     http.HandleFunc("/coasters/", coastersHandlers.getCoaster)
+    http.HandleFunc("/admin", admin.handler)
     err := http.ListenAndServe(":8080", nil)
     if err != nil {
         panic(err)
